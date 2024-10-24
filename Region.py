@@ -69,7 +69,7 @@ class Region:
     def add_df(self, file, name: str, year: str, lvl: int):
         if file.endswith(".csv"):
             self.df_list.append(Df(pd.read_csv(file), name, year, lvl))
-            print("Df ", file, " added to region ", self.name)
+            # print("Df ", file, " added to region ", self.name)
         else:
             print("Error: the file is not readable.")
 
@@ -80,11 +80,11 @@ class Region:
         if file.endswith(".tif"):
             new_raster = GIS_Raster(file, name, year, lvl)
             self.gis_list.append(new_raster)
-            print("Raster ", file, " added to region ", self.name)
+            # print("Raster ", file, " added to region ", self.name)
         elif file.endswith(".shp"):
             new_shp = GIS_Shapefile(file, name, year=year, lvl=lvl)
             self.gis_list.append(new_shp)
-            print("Shapefile ", file, " added to region ", self.name)
+            # print("Shapefile ", file, " added to region ", self.name)
         else:
             print(file, " not added, check the file extension")
 

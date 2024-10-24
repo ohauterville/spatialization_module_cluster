@@ -135,6 +135,30 @@ class Fit:
 
         self._compute_errors()
 
+    def fit_exponential_decay2(self, init=[1, 1], bounds=([0, 0], [1000, 1000])):
+        popt, _ = curve_fit(
+            self._exponential_decay2_objective,
+            self.x1,
+            self.y,
+            p0=init,
+            bounds=bounds,
+        )
+        for param in popt:
+            self.fitted_params.append(param)
+
+        self.y_pred = self._exponential_decay2_objective(
+            self.x1,
+            self.fitted_params[0],
+            self.fitted_params[1],
+        )
+        self.y_fit = self._exponential_decay2_objective(
+            self.x1_fit,
+            self.fitted_params[0],
+            self.fitted_params[1],
+        )
+
+        self._compute_errors()
+
     def fit_reciprocal(self, init=[1, 10], bounds=([0, 0], [10, 1000])):
         popt, _ = curve_fit(
             self._reciprocal_objective, self.x1, self.y, p0=init, bounds=bounds
@@ -166,8 +190,8 @@ class Fit:
     def _exponential_decay_objective(self, X, a, b, c):
         return a * np.exp(-b * X) + c
 
-    def _reciprocal_objective(self, X, a, b):
-        return (a / X) + b
+    def _exponential_decay2_objective(self, X, a, b):
+        return a * np.exp(-b * X)
 
     def _linear_objective(self, x1, a, b):
         return a * x1 + b
