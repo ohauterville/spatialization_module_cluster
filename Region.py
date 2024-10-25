@@ -15,7 +15,7 @@ class Region:
         self.name = name
         self.lvl = lvl
         self.subregion_borders = subregion_borders
-        self.identifier = identifier  # column name to match the data in the DFs
+        self.parent_name = None        
 
         self.gis_list = []
         self.df_list = []
@@ -88,32 +88,47 @@ class Region:
         else:
             print(file, " not added, check the file extension")
 
-    def make_subregions(self, subregion_borders: str, subregion_col: str, parent_region_col: str):
+    def make_subregions(self, subregion_borders: str, subregion_col: str, parent_region_col: str, overwrite=False):
+        print("START: ", self.name)
         if os.path.isfile(subregion_borders) and subregion_borders.endswith(".shp"):
             shapefile = gpd.read_file(subregion_borders)
             for index, row in shapefile.iterrows():
                 if row[parent_region_col] == self.name:  # OECD specific
                     child = Region(str(row[subregion_col]), self.lvl + 1)
+                    child.parent_name = self.name
+
                     error_check = False
                     for gis in self.gis_list:
-                        sub_gis = gis.make_mask(
-                            shapefile, row[subregion_col], subregion_col, self.name
-                        )
-
-                        if not sub_gis:
-                            error_check = True
-                        else:
-
-                            child.add_gis(
-                                sub_gis,
-                                name=str(row[subregion_col]),
-                                year=gis.year,
-                                lvl=self.lvl + 1,
+                        if not os.path.isfile(os.path.join(os.path.dirname(gis.file), os.path.join(self.name, "subregions"),
+                                    f"{row[subregion_col]}.tif",)) or overwrite:
+                            sub_gis = gis.make_mask(
+                                shapefile, row[subregion_col], subregion_col, self.name, overwrite=overwrite
                             )
-                    if not error_check:
-                        self.subregions.append(child)
+
+                            if not sub_gis:
+                                error_check = True
+                            else:
+                                child.add_gis(
+                                    sub_gis,
+                                    name=str(row[subregion_col]),
+                                    year=gis.year,
+                                    lvl=self.lvl + 1,
+                                )
+                        else:
+                            child.add_gis(
+                                    os.path.join(os.path.dirname(gis.file), os.path.join(self.name, "subregions"),
+                                    f"{row[subregion_col]}.tif",),
+                                    name=str(row[subregion_col]),
+                                    year=gis.year,
+                                    lvl=self.lvl + 1,
+                                )
+                        if not error_check:
+                            self.subregions.append(child)
+            
         else:
             print("The administrative units file does not exist or is not a shapefile.")
+
+        print("END: ", self.name)
 
     def get_total_sum_pixel_values(self, band=0, pass_on=False):
         [gis.get_total_sum_pixel_values() for gis in self.gis_list]
