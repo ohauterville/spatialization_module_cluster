@@ -129,6 +129,33 @@ class Region:
             print("The administrative units file does not exist or is not a shapefile.")
 
         print("END: ", self.name)
+    
+    def compute_own_df(self, years, type: str):
+        if type == "GHSL_OECD":
+            self.output_df = pd.DataFrame({"year": years, "GDP per capita":None, "Population": None, "Built up surface GHSL/Population": None, "Population/Total surface": None})
+
+            for y in years:
+                gdp_sum = 0
+                population = 0
+                ghsl_surface = 0
+                total_surface = 0
+
+                for subregion in self.subregions:                  
+                    # intensive
+                    population += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population"].sum()
+                    ghsl_surface += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Built up surface GHSL"].sum()
+                    total_surface += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Total surface"].sum()
+                    # extensive
+                    gdp_sum += subregion.output_df.loc[subregion.output_df["year"]==int(y), "GDP per capita"].sum() * subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population"].sum()
+                
+                # Finally
+                self.output_df.loc[self.output_df["year"]==y, "GDP per capita"] = gdp_sum/population
+                self.output_df.loc[self.output_df["year"]==y, "Population"] = population
+                self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL"] = ghsl_surface
+                self.output_df.loc[self.output_df["year"]==y, "Total surface"] = total_surface
+                self.output_df.loc[self.output_df["year"]==y, "Population/Total surface"] = population / total_surface
+                self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL/Population"] = ghsl_surface / population
+  
 
     def get_total_sum_pixel_values(self, band=0, pass_on=False):
         [gis.get_total_sum_pixel_values() for gis in self.gis_list]
