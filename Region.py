@@ -110,7 +110,7 @@ class Region:
                             else:
                                 child.add_gis(
                                     sub_gis,
-                                    name=str(row[subregion_col]),
+                                    name=gis.name,
                                     year=gis.year,
                                     lvl=self.lvl + 1,
                                 )
@@ -118,7 +118,7 @@ class Region:
                             child.add_gis(
                                     os.path.join(os.path.dirname(gis.file), os.path.join(self.name, "subregions"),
                                     f"{row[subregion_col]}.tif",),
-                                    name=str(row[subregion_col]),
+                                    name=gis.name,
                                     year=gis.year,
                                     lvl=self.lvl + 1,
                                 )
@@ -132,29 +132,49 @@ class Region:
     
     def compute_own_df(self, years, type: str):
         if type == "GHSL_OECD":
-            self.output_df = pd.DataFrame({"year": years, "GDP per capita":None, "Population": None, "Built up surface GHSL/Population": None, "Population/Total surface": None})
+            self.output_df = pd.DataFrame({"year": years, "GDP per capita":None, "Population_OECD": None, "Population_GHSL":None, "Built up surface GHSL/Population_OECD": None, "Population_OECD/Total surface": None})
 
             for y in years:
                 gdp_sum = 0
-                population = 0
+                population_OECD = 0
+                population_GHSL = 0
                 ghsl_surface = 0
                 total_surface = 0
 
                 for subregion in self.subregions:                  
                     # intensive
-                    population += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population"].sum()
+                    population_GHSL += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population_GHSL"].sum()
+                    population_OECD += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population_OECD"].sum()
                     ghsl_surface += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Built up surface GHSL"].sum()
                     total_surface += subregion.output_df.loc[subregion.output_df["year"]==int(y), "Total surface"].sum()
                     # extensive
-                    gdp_sum += subregion.output_df.loc[subregion.output_df["year"]==int(y), "GDP per capita"].sum() * subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population"].sum()
+                    gdp_sum += subregion.output_df.loc[subregion.output_df["year"]==int(y), "GDP per capita"].sum() * subregion.output_df.loc[subregion.output_df["year"]==int(y), "Population_OECD"].sum()
                 
                 # Finally
-                self.output_df.loc[self.output_df["year"]==y, "GDP per capita"] = gdp_sum/population
-                self.output_df.loc[self.output_df["year"]==y, "Population"] = population
+                if population_OECD != 0:
+                    if gdp_sum != 0:
+                        self.output_df.loc[self.output_df["year"]==y, "GDP per capita"] = gdp_sum/population_OECD
+                    else:
+                        pass
+
+                    self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL/Population_OECD"] = ghsl_surface / population_OECD
+                    self.output_df.loc[self.output_df["year"]==y, "Population_OECD"] = population_OECD
+                    self.output_df.loc[self.output_df["year"]==y, "Population_OECD/Total surface"] = population_OECD / total_surface
+                
+                # same but with the pop computed by GHSL
+                if gdp_sum != 0:
+                    self.output_df.loc[self.output_df["year"]==y, "GDP per capita"] = gdp_sum/population_GHSL
+                else:
+                    pass
+        
+                self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL/Population_GHSL"] = ghsl_surface / population_GHSL
+                self.output_df.loc[self.output_df["year"]==y, "Population_GHSL"] = population_GHSL
+                self.output_df.loc[self.output_df["year"]==y, "Population_GHSL/Total surface"] = population_GHSL / total_surface
+
+                # these should always be found
                 self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL"] = ghsl_surface
                 self.output_df.loc[self.output_df["year"]==y, "Total surface"] = total_surface
-                self.output_df.loc[self.output_df["year"]==y, "Population/Total surface"] = population / total_surface
-                self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL/Population"] = ghsl_surface / population
+                
   
 
     def get_total_sum_pixel_values(self, band=0, pass_on=False):

@@ -16,7 +16,7 @@ class GIS_Shapefile(GIS):
                 self.lvl = lvl
             else:
                 print(
-                    "The file seems to be neither a shapefile. Please check the given file."
+                    "The file: ", file, " seems to be neither a raster. Please check the given file."
                 )
                 sys.exit()
         else:

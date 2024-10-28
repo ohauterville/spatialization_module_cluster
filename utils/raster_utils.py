@@ -3,39 +3,30 @@ import rasterio
 from rasterio.mask import mask
 import geopandas as gpd
 from shapely.geometry import mapping
-
+from concurrent.futures import ThreadPoolExecutor
+import itertools
 
 # import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-year = "2000"
-type = "S"
 
-raster_path = (
-    "/home/hautervo/Documents/Data/GHSL/Built_" + type + "/E" + year + "_100m_Global/"
-)
-global_raster = (
-    raster_path + "GHS_BUILT_S_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif"
-)
-
-output_path = raster_path + "children/"
-
-admin_units = "/home/hautervo/Documents/Data/admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
+max_workers = 32
 
 
-def make_children(shapefile_path, raster_path, output_path):
+def make_children(shapefile_path, raster_path, output_path, col_name: str):
     shapefile = gpd.read_file(shapefile_path)
-    # Ensure the shapefile geometry is in the same coordinate system as the raster
-    with rasterio.open(raster_path) as src:
+     
+    with rasterio.open(raster_path) as src:  
         crs = src.crs
 
     if shapefile.crs != crs:
         shapefile = shapefile.to_crs(crs)
-
     # Read the raster file
-    with rasterio.open(raster_path) as src:
+    with rasterio.open(raster_path) as src:      
+
         for index, row in shapefile.iterrows():
+            # print(row)
             geometry = row.geometry
             shape = [mapping(geometry)]
 
@@ -56,8 +47,7 @@ def make_children(shapefile_path, raster_path, output_path):
             )
 
             # Define the output raster path
-            print(row.region)
-            output_raster_path = os.path.join(output_path, f"{row.region}.tif")
+            output_raster_path = os.path.join(output_path, f"{row[col_name]}.tif")
             os.makedirs(os.path.dirname(output_raster_path), exist_ok=True)
 
             # Save the clipped raster to a new file
@@ -105,13 +95,29 @@ def make_one_child(shapefile_path, raster_path, output_path, col_name: str, id: 
                 # Save the clipped raster to a new file
                 with rasterio.open(output_raster_path, "w", **out_meta) as dest:
                     dest.write(out_image)
-                    print("Done.")
+                print("END ", output_raster_path)
 
 
 ### MAIN
+type = "POP"
+
+data_folder = "/data/mineralogie/hautervo/data/"
+admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
+
+years = ["1990", "2010"]
+loop_raster = []
+loop_output_path = []
+
+for year in years:
+    raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
+    loop_raster.append(raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif")
+    loop_output_path.append(raster_path + "subregions/")
+
 
 if __name__ == "__main__":
-    # admin_units = "/home/hautervo/Documents/Data/admin_units/fra_regions_2015/regions_metropole_2015.shp"
-    make_one_child(admin_units, global_raster, output_path, "iso3", "DEU")
+    # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    #     executor.map(make_one_child, itertools.repeat(admin_units), itertools.repeat(global_raster), itertools.repeat(output_path), itertools.repeat("iso3"), )
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(make_children, itertools.repeat(admin_units), loop_raster, loop_output_path, itertools.repeat("iso3"), )
 
     print("Job done.")
