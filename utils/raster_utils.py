@@ -10,7 +10,7 @@ import itertools
 import numpy as np
 import sys
 
-
+# ipdb.set_trace()
 max_workers = 32
 
 
@@ -24,35 +24,36 @@ def make_children(shapefile_path, raster_path, output_path, col_name: str):
         shapefile = shapefile.to_crs(crs)
     # Read the raster file
     with rasterio.open(raster_path) as src:      
-
         for index, row in shapefile.iterrows():
-            # print(row)
-            geometry = row.geometry
-            shape = [mapping(geometry)]
-
-            # Mask the raster with the individual shape
-            out_image, out_transform = mask(src, shape, crop=True)
-            out_meta = src.meta.copy()
-
-            # Update the metadata with new dimensions, transform, and CRS
-            out_meta.update(
-                {
-                    "driver": "GTiff",
-                    "height": out_image.shape[1],
-                    "width": out_image.shape[2],
-                    "transform": out_transform,
-                    "dtype": out_image.dtype,
-                    "compress": "lzw",  # lossless compression algorithm
-                }
-            )
-
-            # Define the output raster path
             output_raster_path = os.path.join(output_path, f"{row[col_name]}.tif")
-            os.makedirs(os.path.dirname(output_raster_path), exist_ok=True)
+            if not os.path.isfile(output_raster_path):                
+                geometry = row.geometry
+                shape = [mapping(geometry)]
 
-            # Save the clipped raster to a new file
-            with rasterio.open(output_raster_path, "w", **out_meta) as dest:
-                dest.write(out_image)
+                # Mask the raster with the individual shape
+                out_image, out_transform = mask(src, shape, crop=True)
+                out_meta = src.meta.copy()
+
+                # Update the metadata with new dimensions, transform, and CRS
+                out_meta.update(
+                    {
+                        "driver": "GTiff",
+                        "height": out_image.shape[1],
+                        "width": out_image.shape[2],
+                        "transform": out_transform,
+                        "dtype": out_image.dtype,
+                        "compress": "lzw",  # lossless compression algorithm
+                    }
+                )
+
+                # Define the output raster path
+                
+                os.makedirs(os.path.dirname(output_raster_path), exist_ok=True)
+
+                # Save the clipped raster to a new file
+                with rasterio.open(output_raster_path, "w", **out_meta) as dest:
+                    dest.write(out_image)
+                print("Done: ", row[col_name])
 
 
 def make_one_child(shapefile_path, raster_path, output_path, col_name: str, id: str):
@@ -104,7 +105,7 @@ type = "POP"
 data_folder = "/data/mineralogie/hautervo/data/"
 admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
 
-years = ["1990", "2010"]
+years = ["1990"]
 loop_raster = []
 loop_output_path = []
 

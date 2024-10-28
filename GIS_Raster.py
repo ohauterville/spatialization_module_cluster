@@ -24,7 +24,7 @@ class GIS_Raster(GIS):
                 )
                 sys.exit()
         else:
-            print("The file does not exists. Check the path.")
+            print("The file: ", file, " does not exists. Check the path.")
             sys.exit()
 
     def make_mask(

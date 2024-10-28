@@ -20,7 +20,7 @@ class GIS_Shapefile(GIS):
                 )
                 sys.exit()
         else:
-            print("The file does not exists. Check the path.")
+            print("The file: ", file, " does not exists. Check the path.")
             sys.exit()
 
     def make_mask(self, shapefile, region_name: str, parent_name: str, overwrite=False):
