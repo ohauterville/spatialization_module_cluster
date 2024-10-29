@@ -5,6 +5,7 @@ import geopandas as gpd
 from shapely.geometry import mapping
 from concurrent.futures import ThreadPoolExecutor
 import itertools
+import pycountry
 
 import numpy as np
 import sys
@@ -100,13 +101,14 @@ def make_one_child(shapefile_path, raster_path, output_path, col_name: str, id: 
 
 ### MAIN
 type = "POP"
-year = "1990"
+year = "2010"
 
 data_folder = "/data/mineralogie/hautervo/data/"
 admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
 
 raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
 global_raster = raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif"
+
 output_path = raster_path + "subregions/"
 
 # years = ["1990"]

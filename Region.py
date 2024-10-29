@@ -89,7 +89,7 @@ class Region:
             print(file, " not added, check the file extension")
 
     def make_subregions(self, gpd_admin_units, subregion_col: str, parent_region_col: str, overwrite=False):
-        print("START: ", self.name)
+        # print("START: ", self.name)
         for index, row in gpd_admin_units.iterrows():
             if row[parent_region_col] == self.name:  # OECD specific
                 child = Region(str(row[subregion_col]), self.lvl + 1)
