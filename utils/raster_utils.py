@@ -6,7 +6,6 @@ from shapely.geometry import mapping
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 
-# import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
@@ -101,24 +100,29 @@ def make_one_child(shapefile_path, raster_path, output_path, col_name: str, id: 
 
 ### MAIN
 type = "POP"
+year = "1990"
 
 data_folder = "/data/mineralogie/hautervo/data/"
 admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
 
-years = ["1990"]
-loop_raster = []
-loop_output_path = []
+raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
+global_raster = raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif"
+output_path = raster_path + "subregions/"
 
-for year in years:
-    raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
-    loop_raster.append(raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif")
-    loop_output_path.append(raster_path + "subregions/")
+# years = ["1990"]
+# loop_raster = []
+# loop_output_path = []
+
+# for year in years:
+#     raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
+#     loop_raster.append(raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif")
+#     loop_output_path.append(raster_path + "subregions/")
 
 
 if __name__ == "__main__":
     # with ThreadPoolExecutor(max_workers=max_workers) as executor:
     #     executor.map(make_one_child, itertools.repeat(admin_units), itertools.repeat(global_raster), itertools.repeat(output_path), itertools.repeat("iso3"), )
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        executor.map(make_children, itertools.repeat(admin_units), loop_raster, loop_output_path, itertools.repeat("iso3"), )
-
+    # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    #     executor.map(make_children, itertools.repeat(admin_units), loop_raster, loop_output_path, itertools.repeat("iso3"), )
+    make_children(admin_units, global_raster, output_path, "iso3")
     print("Job done.")
