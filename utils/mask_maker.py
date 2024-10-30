@@ -8,45 +8,66 @@ import pycountry
 import numpy as np
 import sys
 
+from concurrent.futures import ThreadPoolExecutor
+import itertools
+import os 
+
+
+max_workers = 32
+
 
 def create_country_mask_from_shapefile(
-    shapefile_filepath, corresponding_orthomosaic_filepath, iso3="FRA"
+    Vector_gpd, src, pycountry
 ):
     """
     This function takes a GeoTIFF and a shapefile of administrative boundaries
     and clip the original GTIFF file along one country boundaries. To specify a country, one can
     provide its iso3 name.
     """
-    Vector = gpd.read_file(shapefile_filepath)
 
-    Vector = Vector[Vector["iso3"] == iso3]  # Subsetting to my AOI
+    output_file = output_path + pycountry.alpha_3 + ".tif"
+    
+    if not os.path.isfile(output_file):
+        try:
+            Vector = Vector_gpd[Vector_gpd["iso3"] == pycountry.alpha_3]  # Subsetting to my AOI
+            
+            if Vector.empty:
+                print(f"No geometry found for {pycountry.alpha_3}")
+                return  # Skip if there is no matching geometry for the country
 
-    with rasterio.open(corresponding_orthomosaic_filepath) as src:
-        Vector = Vector.to_crs(src.crs)
-        # print(Vector.crs)
-        out_image, out_transform = mask(src, Vector.geometry, crop=True)
-        out_meta = src.meta.copy()  # copy the metadata of the source DEM
+            with rasterio.open(global_raster) as src:
+                # Vector_gpd = Vector_gpd.to_crs(src.crs)
+                out_image, out_transform = mask(src, Vector.geometry, crop=True)
+                out_meta = src.meta.copy()  # copy the metadata of the source DEM
 
-    out_meta.update(
-        {
-            "driver": "Gtiff",
-            "height": out_image.shape[1],  # height starts with shape[1]
-            "width": out_image.shape[2],  # width starts with shape[2]
-            "transform": out_transform,
-            "dtype": out_image.dtype,
-            "compress": "lzw",  # lossless compression algorithm
-        }
-    )
+                out_meta.update(
+                    {
+                        "driver": "Gtiff",
+                        "height": out_image.shape[1],  # height starts with shape[1]
+                        "width": out_image.shape[2],  # width starts with shape[2]
+                        "transform": out_transform,
+                        "dtype": out_image.dtype,
+                        "compress": "lzw",  # lossless compression algorithm
+                    }
+                )
 
-    output_file = output_path + iso3 + ".tif"
+                
+                os.makedirs(os.path.dirname(output_file), exist_ok="True")
+                with rasterio.open(output_file, "w", **out_meta) as dest:
+                    dest.write(out_image)
+                    print("Success: ", output_file)
+        except Exception as e:
+            print(e)
 
-    with rasterio.open(output_file, "w", **out_meta) as dest:
-        dest.write(out_image)
+    else:
+        print("File already existing: ", output_file)
 
 ### MAIN
 type = "POP"
-year = "1990"
+year = "2010"
+mode = 1
 
+###
 data_folder = "/data/mineralogie/hautervo/data/"
 admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
 
@@ -55,23 +76,29 @@ global_raster = raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A
 
 output_path = raster_path + "subregions/"
 
+###
 if __name__ == "__main__":
-    batch_size = 350
-    if len(sys.argv) > 1:
-        iteration_nb = int(sys.argv[1])
-    else:
-        iteration_nb = 0
-
     print("Starting...")
-    for i in range(0, batch_size):
-        country = list(pycountry.countries)[i + iteration_nb * batch_size]
+    Vector_gpd = gpd.read_file(admin_units)
 
-        try:
-            create_country_mask_from_shapefile(
-                admin_units, global_raster, iso3=country.alpha_3
-            )
-            # print("Success for : ", country.alpha_3)
-        except Exception as err:
-            print("Error for : ", country.alpha_3)
-            print(f"Unexpected {err=}, {type(err)=}")
+    with rasterio.open(global_raster) as src:
+        Vector_gpd = Vector_gpd.to_crs(src.crs)
+
+    # PARALLEL MODE
+    if mode == 0:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            executor.map(create_country_mask_from_shapefile, itertools.repeat(Vector_gpd), itertools.repeat(global_raster), list(pycountry.countries))
+   
+    # SERIAL MODE
+    elif mode == 1:        
+        for country in pycountry.countries:
+            try:
+                print("Start ", country.alpha_3)
+                create_country_mask_from_shapefile(
+                    Vector_gpd, global_raster, country
+                )
+            except Exception as err:
+                print("Error for : ", country.alpha_3)
+                print(f"Unexpected {err=}, {type(err)=}")
+
     print("Job done.")
