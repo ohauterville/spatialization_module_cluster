@@ -13,7 +13,7 @@ import itertools
 import os 
 
 
-max_workers = 32
+max_workers = 12
 
 
 def create_country_mask_from_shapefile(
@@ -35,6 +35,7 @@ def create_country_mask_from_shapefile(
                 print(f"No geometry found for {pycountry.alpha_3}")
                 return  # Skip if there is no matching geometry for the country
 
+            print("Start ", pycountry.alpha_3)
             with rasterio.open(global_raster) as src:
                 # Vector_gpd = Vector_gpd.to_crs(src.crs)
                 out_image, out_transform = mask(src, Vector.geometry, crop=True)
@@ -65,12 +66,14 @@ def create_country_mask_from_shapefile(
 ### MAIN
 type = "POP"
 year = "2010"
-mode = 1
+mode = 1 # 0 for parallel, 1 for serial
 
 ###
 data_folder = "/data/mineralogie/hautervo/data/"
 admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
 
+# raster_path = data_folder + "GHSL/" + type + "/E" + year + "/"
+# global_raster = raster_path + "GHS_" + type + "_E" + year + "_GLOBE_R2023A_54009_1000_V2_0.tif"
 raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
 global_raster = raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif"
 
@@ -93,7 +96,6 @@ if __name__ == "__main__":
     elif mode == 1:        
         for country in pycountry.countries:
             try:
-                print("Start ", country.alpha_3)
                 create_country_mask_from_shapefile(
                     Vector_gpd, global_raster, country
                 )

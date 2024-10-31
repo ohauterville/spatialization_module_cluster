@@ -11,16 +11,19 @@ ox.settings.timeout = 600
 
 
 class Region:
-    def __init__(self, name: str, lvl: int, subregion_borders=""):
+    def __init__(self, name: str, lvl: int,):
         self.name = name
         self.lvl = lvl
-        self.subregion_borders = subregion_borders
-        self.parent_name = None        
+        self.parent_name = None  
+
+        self.geometry = None
+        self.crs = None
+      
 
         self.gis_list = []
         self.df_list = []
         self.fit_list = []
-        self.osm = None
+        self.osm_list = []
 
         self.subregions = []
         self.c_plot = ""  # plot color
@@ -28,20 +31,23 @@ class Region:
         # outputs
         self.output_df = None #supposed to be the final DF with the observed values
 
-    def add_osm(self, name: str, tag: str):
+    def get_osm_by_tag(self, place_name: str, tag: str, place_geometry=None, crs="EPSG:4326"):
+        """
+        If place_geometry is given, the function will take the osm tags within this area
+        """
         tags = {tag: True}
 
-        if name.endswith(".shp"):
-            gdf_boundary = gpd.read_file(name)
-            if gdf_boundary.crs != "EPSG:4326":
-                gdf_boundary = gdf_boundary.to_crs("EPSG:4326")
-            osm_data = ox.features_from_polygon(
-                gdf_boundary,
-                tags,
-            )
-        else:
-            osm_data = ox.features_from_place(name, tags)
+        if place_geometry:
+            if crs != "EPSG:4326":
+                gdf = gpd.GeoDataFrame(index=[0], crs=crs, geometry=[place_geometry])  # Assuming the original CRS is WGS84 (EPSG:4326)
+                gdf = gdf.to_crs("EPSG:4326")
+                place_geometry = gdf.geometry.iloc[0]
 
+            osm_data = ox.features_from_polygon(place_geometry, tags,)
+        else: 
+            osm_data = ox.features_from_place(place_name, tags)
+
+        ###   
         osm_data = osm_data[[tag, "geometry"]]
 
         if tag == "building" or tag == "landuse":
@@ -61,10 +67,11 @@ class Region:
             osm_data = osm_data.set_crs(epsg=4326)
         osm_data = osm_data.to_crs(epsg=32633)
 
-        self.osm = osm_data
+        ### save
+        self.osm_list.append(Df(osm_data), place_name, "", "") # TODO object osm data
 
-        print(self.osm.head)
-        print(self.osm.shape)
+        print(self.osm_list[-1].df.head)
+        print(self.osm_list[-1].df.shape)
 
     def add_df(self, file, name: str, year: str, lvl: int):
         if file.endswith(".csv"):
@@ -92,8 +99,10 @@ class Region:
         # print("START: ", self.name)
         for index, row in gpd_admin_units.iterrows():
             if row[parent_region_col] == self.name:  # OECD specific
-                child = Region(str(row[subregion_col]), self.lvl + 1)
-                child.parent_name = self.name
+                subregion = Region(str(row[subregion_col]), self.lvl + 1)
+                subregion.parent_name = self.name
+                subregion.geometry = row.geometry
+                subregion.crs = gpd_admin_units.crs
 
                 error_check = False
                 for gis in self.gis_list:
@@ -106,22 +115,23 @@ class Region:
                         if not sub_gis:
                             error_check = True
                         else:
-                            child.add_gis(
+                            subregion.add_gis(
                                 sub_gis,
                                 name=gis.name,
                                 year=gis.year,
                                 lvl=self.lvl + 1,
                             )
                     else:
-                        child.add_gis(
+                        subregion.add_gis(
                                 os.path.join(os.path.dirname(gis.file), os.path.join(self.name, "subregions"),
                                 f"{row[subregion_col]}.tif",),
                                 name=gis.name,
                                 year=gis.year,
                                 lvl=self.lvl + 1,
                             )
-                    if not error_check:
-                        self.subregions.append(child)
+                        
+                ###
+                self.subregions.append(subregion)
 
         print("END: ", self.name)
 
@@ -206,8 +216,8 @@ class Region:
 
     #     if pass_on and self.has_subregions():
     #         [
-    #             child.get_total_sum_pixel_values(pass_on=pass_on)
-    #             for child in self.subregions
+    #             subregion.get_total_sum_pixel_values(pass_on=pass_on)
+    #             for subregion in self.subregions
     #         ]
 
     def has_subregions(self):
