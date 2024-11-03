@@ -5,103 +5,51 @@ import shutil
 import geopandas as gpd
 import pandas as pd
 import osmnx as ox
+from shapely.geometry import box
+from tqdm import tqdm  # Import the tqdm function from the tqdm module
+from concurrent.futures import ThreadPoolExecutor
+import itertools
 
-ox.settings.requests_timeout = 7200
+ox.settings.requests_timeout = 15000
 ox.settings.memory_only = False
 
 CRED = "\033[31m"
 CYEL = "\33[33m"
 CEND = "\33[0m"
 
-# place_list = [
-#     "ain",
-#     "allier",
-#     "ardeche",
-#     "cantal",
-#     "drome",
-#     "isere",
-#     "loire",
-#     "haute-loire",
-#     "puy-de-dome",
-#     "rhone",
-#     "savoie",
-#     "haute-savoie",
-# ]
-
-# place_list = [
-#     "Ariège",
-#     "Aude",
-#     "Aveyron",
-#     "Gard",
-#     "Haute-Garonne",
-#     "Gers",
-#     "Hérault",
-#     "Lot",
-#     "Lozère",
-#     "Hautes-Pyrénées",
-#     "Pyrénées-Orientales",
-#     "Tarn",
-#     "Tarn-et-Garonne",
-# ]
-
-# place_list = [
-#     "Charente",
-#     "Charente-Maritime",
-#     "Corrèze",
-#     "Creuse",
-#     "Dordogne",
-#     "Gironde",
-#     "Landes",
-#     "Lot-et-Garonne",
-#     "Pyrénées-Atlantiques",
-#     "Deux-Sèvres",
-#     "Vienne",
-#     "Haute-Vienne",
-# ]
-
-# place_list = [
-#     "Ardennes",
-#     "Aube",
-#     "Bas-Rhin",
-#     "Haut-Rhin",
-#     "Haute-Marne",
-#     "Marne",
-#     "Meurthe-et-Moselle",
-#     "Meuse",
-#     "Moselle",
-#     "Vosges",
-# ]
-
-# place_list = [
-#     "Cote-d Or",
-#     "Doubs",
-#     "Jura",
-#     "Nievre",
-#     "Haute-Saone",
-#     "Saone-et-Loire",
-#     "Yonne",
-#     "Belfort",
-# ]
-
-place_list = [
-    # "DE-SH",
-    # "DE-TH",
-    # "DE-SN",
-    # "DE-ST",
-    # "DE-MV",
-    # "DE-BB",
-    "DE-NW",
-    "DE-BW",
-    "DE-NI",
-    "DE-BY",
-]
-
 data_folder = "/data/mineralogie/hautervo/data/"
+max_workers = 4
+n_grid = 5
 
 
 ###
+def create_grid(geometry, n_rows, n_cols):
+    """
+    Divide a large geometry into a grid of smaller bounding boxes.
+    Args:
+        geometry (shapely.geometry.Polygon): The large polygon to divide.
+        n_rows (int): Number of rows for the grid.
+        n_cols (int): Number of columns for the grid.
+    Returns:
+        List of smaller polygons within the grid.
+    """
+    minx, miny, maxx, maxy = geometry.bounds
+    width = (maxx - minx) / n_cols
+    height = (maxy - miny) / n_rows
+    grid_polygons = []
+
+    for i in range(n_cols):
+        for j in range(n_rows):
+            new_minx = minx + i * width
+            new_maxx = minx + (i + 1) * width
+            new_miny = miny + j * height
+            new_maxy = miny + (j + 1) * height
+            grid_polygons.append(box(new_minx, new_miny, new_maxx, new_maxy))
+    
+    return grid_polygons
+
 def download_osm_data(
-    gdf, subregion_col: str, parent_col: str, tag: str, lvl: int, country_filter: str
+    gdf, subregion_col: str, parent_col: str, tag: str, lvl: int, country_filter: str, parallel=False
 ):
     if gdf.crs is None:
         gdf = gdf.set_crs("EPSG:4326")
@@ -130,12 +78,25 @@ def download_osm_data(
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
             if not os.path.isfile(output_file):
+                print("Starting the download of ", output_file)
+                osm_data = gpd.GeoDataFrame()
                 polygon = row.geometry            # Get the polygon geometry of the region
 
-                polygon_gs = gpd.GeoSeries([polygon], crs="EPSG:4326").loc[0]
+                # Create a grid of smaller polygons (e.g., 5x5 grid)
+                sub_polygons = create_grid(polygon, n_rows=n_grid, n_cols=n_grid)
 
-                osm_data = ox.features_from_polygon(polygon_gs, tags)
-                # osm_data = ox.features_from_place(place, tags)
+                ### Parallel
+                if parallel:
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        results = list(tqdm(executor.map(fetch_osm, sub_polygons, itertools.repeat(tags)), total=n_grid**2, desc="Processing"))
+
+                    for features in results:
+                        osm_data = pd.concat([osm_data, features], ignore_index=True)
+                else:
+                    ### serial
+                    for _polygon in tqdm(sub_polygons, desc="Processing"):
+                        osm_data_small = fetch_osm(_polygon, tags)
+                        osm_data = pd.concat([osm_data, osm_data_small], ignore_index=True)
 
                 osm_data = osm_data[[tag, "geometry"]]
 
@@ -159,14 +120,18 @@ def download_osm_data(
                 osm_data = osm_data.to_crs(osm_data.estimate_utm_crs())  # EPSG 3857 is a common Web Mercator projection
 
                 osm_data.to_file(output_file)
-                print("Success ", output_file)            
-
+                print("Success ", output_file)    
+                shutil.rmtree("/home/hautervo/cache")        
             else:
                 print("File already exists: ", output_file)
+        
 
     print("Done.")
 
-
+def fetch_osm(polygon, tags):
+    polygon_gs = gpd.GeoSeries([polygon], crs="EPSG:4326").loc[0]
+    osm_data = ox.features_from_polygon(polygon_gs, tags)
+    return osm_data
 
 def merge_shp(shp_list, region_nm):
     print("Starting the merge of ", region_nm)
@@ -221,9 +186,12 @@ def spatial_join(shp1 , shp2):
 lvl = 2
 
 oecd_admin_units = data_folder + "OECD/admin_units/TL" + str(lvl) + "/OECD_TL" + str(lvl) + "_2020.shp"
-oecd_iso3166_admin_units = data_folder + "/admin_units/oecd_iso3166-2/oecd_tl2_and_iso3166-2.shp"
+# oecd_iso3166_admin_units = data_folder + "/admin_units/oecd_iso3166-2/oecd_tl2_and_iso3166-2.shp"
 subregion_col = "tl"+str(lvl)+"_id"
 parent_col = "iso3"
+
+country = "BEL"
+parallel = False
 
 if __name__ == "__main__":
     # shp2 = gpd.read_file(data_folder + "admin_units/iso3166-2/iso3166-2-boundaries.shp")
@@ -236,7 +204,7 @@ if __name__ == "__main__":
     gdf = gpd.read_file(oecd_admin_units)
     gdf = gdf[gdf.is_valid & ~gdf.is_empty]
 
-    download_osm_data(gdf, subregion_col, parent_col, "building", lvl, country_filter="FRA")
+    download_osm_data(gdf, subregion_col, parent_col, "building", lvl, country_filter=country, parallel=parallel)
     # shutil.rmtree("/home/hautervo/cache")
 
     # merge_shp(place_list, "FR-ARA")
