@@ -10,7 +10,7 @@ from tqdm import tqdm  # Import the tqdm function from the tqdm module
 from concurrent.futures import ThreadPoolExecutor
 import itertools
 
-ox.settings.requests_timeout = 15000
+ox.settings.requests_timeout = 72*3600
 ox.settings.memory_only = False
 
 CRED = "\033[31m"
@@ -40,11 +40,16 @@ def create_grid(geometry, n_rows, n_cols):
 
     for i in range(n_cols):
         for j in range(n_rows):
-            new_minx = minx + i * width
-            new_maxx = minx + (i + 1) * width
-            new_miny = miny + j * height
-            new_maxy = miny + (j + 1) * height
-            grid_polygons.append(box(new_minx, new_miny, new_maxx, new_maxy))
+             # Create a single cell in the grid
+            cell = box(minx + i * width, miny + j * height,
+                       minx + (i + 1) * width, miny + (j + 1) * height)
+
+            # Calculate the intersection of the cell with the geometry
+            intersection = geometry.intersection(cell)
+            
+            # Only add non-empty intersections
+            if not intersection.is_empty:
+                grid_polygons.append(intersection)
     
     return grid_polygons
 
@@ -65,13 +70,14 @@ def download_osm_data(
     for idx, row in gdf.iterrows():
         if row[parent_col] == country_filter:
             output_path = (
-                data_folder +
-                "osm/"
+                data_folder 
+                + "Outputs/"
+                + "OSM/"
                 + tag
-                + "/"
-                + row[parent_col]
                 + "/TL"
                 + str(lvl)
+                + "/"
+                + row[parent_col]
                 + "/"
             )
             output_file = output_path + row[subregion_col] + "/" + row[subregion_col] + ".shp"
@@ -88,13 +94,13 @@ def download_osm_data(
                 ### Parallel
                 if parallel:
                     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                        results = list(tqdm(executor.map(fetch_osm, sub_polygons, itertools.repeat(tags)), total=n_grid**2, desc="Processing"))
+                        results = list(tqdm(executor.map(fetch_osm, sub_polygons, itertools.repeat(tags)), total=n_grid**2, desc=f"Processing: {row[subregion_col]}"))
 
                     for features in results:
                         osm_data = pd.concat([osm_data, features], ignore_index=True)
                 else:
                     ### serial
-                    for _polygon in tqdm(sub_polygons, desc="Processing"):
+                    for _polygon in tqdm(sub_polygons, desc=f"Processing: {row[subregion_col]}"):
                         osm_data_small = fetch_osm(_polygon, tags)
                         osm_data = pd.concat([osm_data, osm_data_small], ignore_index=True)
 
@@ -119,7 +125,7 @@ def download_osm_data(
                 # Reproject to a projection that uses meters
                 osm_data = osm_data.to_crs(osm_data.estimate_utm_crs())  # EPSG 3857 is a common Web Mercator projection
 
-                osm_data.to_file(output_file)
+                osm_data.to_file(output_file, driver="ESRI Shapefile")
                 print("Success ", output_file)    
                 shutil.rmtree("/home/hautervo/cache")        
             else:
@@ -190,7 +196,7 @@ oecd_admin_units = data_folder + "OECD/admin_units/TL" + str(lvl) + "/OECD_TL" +
 subregion_col = "tl"+str(lvl)+"_id"
 parent_col = "iso3"
 
-country = "BEL"
+country = "FRA"
 parallel = False
 
 if __name__ == "__main__":

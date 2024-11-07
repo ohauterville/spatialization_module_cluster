@@ -7,7 +7,7 @@ import geopandas as gpd
 import osmnx as ox
 import pandas as pd
 
-ox.settings.timeout = 600
+ox.settings.timeout = 6000
 
 
 class Region:
@@ -24,6 +24,8 @@ class Region:
         self.df_list = []
         self.fit_list = []
         self.osm_list = []
+
+        self.output_df_list = []
 
         self.subregions = []
         self.c_plot = ""  # plot color
@@ -68,20 +70,20 @@ class Region:
         osm_data = osm_data.to_crs(epsg=32633)
 
         ### save
-        self.osm_list.append(Df(osm_data), place_name, "", "") # TODO object osm data
+        self.osm_list.append(Df(osm_data), place_name) 
 
         print(self.osm_list[-1].df.head)
         print(self.osm_list[-1].df.shape)
 
-    def add_df(self, file, name: str, year: str, lvl: int):
+    def add_df(self, file, name: str):
         if file.endswith(".csv"):
-            self.df_list.append(Df(pd.read_csv(file), name, year, lvl))
+            self.df_list.append(Df(pd.read_csv(file), name))
             # print("Df ", file, " added to region ", self.name)
         else:
             print("Error: the file is not readable.")
 
-    def add_dataframe(self, file: pd.DataFrame, name: str, year: str, lvl: int):
-        self.df_list.append(Df(file, name, year, lvl))
+    def add_dataframe(self, file: pd.DataFrame, name: str):
+        self.df_list.append(Df(file, name))
 
     def add_gis(self, file, name: str, year: str, lvl: int):
         if file.endswith(".tif"):
@@ -104,7 +106,6 @@ class Region:
                 subregion.geometry = row.geometry
                 subregion.crs = gpd_admin_units.crs
 
-                error_check = False
                 for gis in self.gis_list:
                     if not os.path.isfile(os.path.join(os.path.dirname(gis.file), os.path.join(self.name, "subregions"),
                                 f"{row[subregion_col]}.tif",)) or overwrite:
@@ -113,7 +114,7 @@ class Region:
                         )
 
                         if not sub_gis:
-                            error_check = True
+                            print("Something went wrong with the mask!")
                         else:
                             subregion.add_gis(
                                 sub_gis,
@@ -135,19 +136,21 @@ class Region:
 
         print("END: ", self.name)
 
-    def make_subregions_visual(self, gpd_admin_units, subregion_col: str, parent_region_col: str, output_csv_path:str, years):
+    def make_subregions_visual(self, gpd_admin_units, subregion_col: str, parent_region_col: str, output_csv_path:str, output_name:str, years):
         # this function is meant to be use for the visualization part only, not the preprocessing one.
+        # TODO: output_csv_path and output_name should be a list to loop on
         for index, row in gpd_admin_units.iterrows():
             if row[parent_region_col] == self.name:  # OECD specific
                 try:
                     subregion = Region(str(row[subregion_col]), self.lvl + 1)
                     subregion.parent_name = self.name
-                    subregion.output_df = pd.read_csv(os.path.join(output_csv_path, subregion.parent_name, subregion.name, '_'.join(years))+".csv")
+                    subregion.output_df_list.append(Df(pd.read_csv(os.path.join(output_csv_path, subregion.parent_name, subregion.name, '_'.join(years))+".csv"), output_name))
                     self.subregions.append(subregion)
                 except Exception as e:
                     print(e)
     
     def compute_own_df(self, years, type: str):
+        # TODO: this should be changed to use the output_df_list instead
         if type == "GHSL_OECD":
             self.output_df = pd.DataFrame({"year": years, "GDP per capita":None, "Population_OECD": None, "Population_GHSL":None, "Built up surface GHSL/Population_OECD": None, "Population_OECD/Total surface": None})
 
@@ -191,6 +194,16 @@ class Region:
                 # these should always be found
                 self.output_df.loc[self.output_df["year"]==y, "Built up surface GHSL"] = ghsl_surface
                 self.output_df.loc[self.output_df["year"]==y, "Total surface"] = total_surface
+
+    def compute_vector_area(self, gis_name: str, output_df_name: str):
+        vector = next((x for x in self.gis_list if x.name == gis_name), None)
+        if vector is not None:
+            value = (vector['geometry'].area).sum()
+            df = pd.DataFrame({"area": value})
+            self.output_df_list.append(Df(df, output_df_name))
+        else: 
+            print(f"The gis: {gis_name} was not found.")
+
 
     def delete_lists(self, pass_on=False):
         try:
