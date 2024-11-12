@@ -19,7 +19,7 @@ CEND = "\33[0m"
 
 data_folder = "/data/mineralogie/hautervo/data/"
 max_workers = 4
-n_grid = 5
+n_grid = 6
 
 
 ###
