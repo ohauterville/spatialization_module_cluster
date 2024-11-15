@@ -119,4 +119,4 @@ class GIS_Raster(GIS):
         with rasterio.open(self.file) as src:
             band = src.read(1).flatten()
             band_filtered = band[band != src.nodata]
-            return len(band_filtered) / 100
+            return len(band_filtered) 
