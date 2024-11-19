@@ -24,12 +24,14 @@ def create_country_mask_from_shapefile(
     and clip the original GTIFF file along one country boundaries. To specify a country, one can
     provide its iso3 name.
     """
+    code = "iso3"
+    code = "GID_0"
 
     output_file = output_path + pycountry.alpha_3 + ".tif"
     
     if not os.path.isfile(output_file):
         try:
-            Vector = Vector_gpd[Vector_gpd["iso3"] == pycountry.alpha_3]  # Subsetting to my AOI
+            Vector = Vector_gpd[Vector_gpd[code] == pycountry.alpha_3]  # Subsetting to my AOI
             
             if Vector.empty:
                 print(f"No geometry found for {pycountry.alpha_3}")
@@ -65,12 +67,13 @@ def create_country_mask_from_shapefile(
 
 ### MAIN
 type = "POP"
-year = "2010"
+year = "1990"
 mode = 1 # 0 for parallel, 1 for serial
 
 ###
 data_folder = "/data/mineralogie/hautervo/data/"
-admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
+# admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
+admin_units = data_folder + "GADM/ESRI_54009/GADM_0_ESRI54009.shp"
 
 # raster_path = data_folder + "GHSL/" + type + "/E" + year + "/"
 # global_raster = raster_path + "GHS_" + type + "_E" + year + "_GLOBE_R2023A_54009_1000_V2_0.tif"
