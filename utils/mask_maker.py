@@ -65,7 +65,7 @@ def create_country_mask_from_shapefile(
 
 ### MAIN
 type = "POP"
-year = "1990"
+year = "2010"
 mode = 1 # 0 for parallel, 1 for serial
 
 ###
