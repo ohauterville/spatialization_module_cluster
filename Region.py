@@ -7,6 +7,8 @@ import geopandas as gpd
 import osmnx as ox
 import pandas as pd
 
+from functools import reduce
+
 ox.settings.timeout = 6000
 
 
@@ -26,6 +28,7 @@ class Region:
         self.osm_list = []
 
         self.output_df_list = []
+        self.output_df_merged = None
 
         self.subregions = []
         self.c_plot = ""  # plot color
@@ -97,6 +100,14 @@ class Region:
         else:
             print(file, " not added, check the file extension")
 
+    def merge_output_dfs(self, col:str):
+        df_list = []
+        for df in self.output_df_list:
+            df_list.append(df.df)
+            
+        self.output_df_merged = reduce(lambda left, right: pd.merge(left, right, on=col), df_list)
+
+
     def make_subregions(self, gpd_admin_units, subregion_col: str, parent_region_col: str, overwrite=False):
         # print("START: ", self.name)
         for index, row in gpd_admin_units.iterrows():
@@ -136,7 +147,7 @@ class Region:
 
         print("END: ", self.name)
 
-    def make_subregions_visual(self, gpd_admin_units, subregion_col: str, parent_region_col: str, output_csv_path:str, output_name:str, years):
+    def make_subregions_visual(self, gpd_admin_units, subregion_col: str, parent_region_col: str, output_csv_paths: list, years):
         # this function is meant to be use for the visualization part only, not the preprocessing one.
         # TODO: output_csv_path and output_name should be a list to loop on
         for index, row in gpd_admin_units.iterrows():
@@ -144,7 +155,9 @@ class Region:
                 try:
                     subregion = Region(str(row[subregion_col]), self.lvl + 1)
                     subregion.parent_name = self.name
-                    subregion.output_df_list.append(Df(pd.read_csv(os.path.join(output_csv_path, subregion.parent_name, subregion.name, '_'.join(years))+".csv"), output_name))
+                    for output_csv_path in output_csv_paths:
+                        subregion.output_df_list.append(Df(pd.read_csv(os.path.join(output_csv_path, subregion.parent_name, subregion.name, '_'.join(years))+".csv"), ""))
+                    subregion.merge_output_dfs("year")
                     self.subregions.append(subregion)
                 except Exception as e:
                     print(e)

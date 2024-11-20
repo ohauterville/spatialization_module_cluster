@@ -88,7 +88,7 @@ def merge_raster(folder:str, output_file:str):
 
 ### MAIN
 type = "POP"
-year = "1990"
+year = "2010"
 mode = 0 # 0 for parallel, 1 for serial
 
 ###
