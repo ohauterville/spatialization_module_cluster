@@ -70,7 +70,9 @@ def merge_raster(folder:str, output_file:str):
         "driver": "GTiff",
         "height": merged_data.shape[1],
         "width": merged_data.shape[2],
-        "transform": merged_transform
+        "transform": merged_transform,
+        "dtype": merged_data.dtype,
+        "compress": "lzw",  # lossless compression algorithm
     })
 
     # Write the merged raster to a new file
@@ -86,7 +88,7 @@ def merge_raster(folder:str, output_file:str):
 
 ### MAIN
 type = "POP"
-year = "2010"
+year = "1990"
 mode = 0 # 0 for parallel, 1 for serial
 
 ###
