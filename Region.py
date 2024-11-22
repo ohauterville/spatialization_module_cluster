@@ -8,6 +8,7 @@ import osmnx as ox
 import pandas as pd
 
 from functools import reduce
+from termcolor import colored
 
 ox.settings.timeout = 6000
 
@@ -109,7 +110,6 @@ class Region:
 
 
     def make_subregions(self, gpd_admin_units, subregion_col: str, parent_region_col: str, overwrite=False):
-        # print("START: ", self.name)
         for index, row in gpd_admin_units.iterrows():
             if row[parent_region_col] == self.name:  # OECD specific
                 subregion = Region(str(row[subregion_col]), self.lvl + 1)
@@ -145,7 +145,7 @@ class Region:
                 ###
                 self.subregions.append(subregion)
 
-        print("END: ", self.name)
+        print(colored("END: {self.name}", "green"))
 
     def make_subregions_visual(self, gpd_admin_units, subregion_col: str, parent_region_col: str, output_csv_paths: list, years):
         # this function is meant to be use for the visualization part only, not the preprocessing one.
