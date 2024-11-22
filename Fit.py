@@ -60,7 +60,7 @@ class Fit:
     def fit_STL(
         self,
         init=[1, 1, 1, 1],
-        bounds=([0, 0, 0, 0], [600, 1000, 1, 100000]),
+        bounds=([0, 0, 0, 0], [600, 10000, 1, 100000]),
     ):
         popt, _ = curve_fit(
             self._STL_objective, [self.x1, self.x2], self.y, p0=init, bounds=bounds
@@ -110,7 +110,7 @@ class Fit:
         self._compute_errors()
 
     def fit_exponential_decay_bias(
-        self, init=[1, 1, 1], bounds=([0, 0, 0], [1000, 1000, 1000])
+        self, init=[1, 1, 1], bounds=([0, 0, 0], [1000, 10000, 1000])
     ):
         popt, _ = curve_fit(
             self._exponential_decay_objective_bias, self.x1, self.y, p0=init, bounds=bounds
@@ -133,7 +133,7 @@ class Fit:
 
         self._compute_errors()
 
-    def fit_exponential_decay(self, init=[1, 1], bounds=([0, 0], [1000, 1000])):
+    def fit_exponential_decay(self, init=[1, 1], bounds=([0, 0], [1000, 10000])):
         popt, _ = curve_fit(
             self._exponential_decay_objective,
             self.x1,
