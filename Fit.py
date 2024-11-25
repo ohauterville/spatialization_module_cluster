@@ -1,7 +1,5 @@
 from scipy.optimize import curve_fit
 import numpy as np
-import pandas as pd
-
 
 class Fit:
     def __init__(self, name, x1, x2, y):
