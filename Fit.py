@@ -57,8 +57,8 @@ class Fit:
 
     def fit_STL(
         self,
-        init=[1, 1, 1, 1],
-        bounds=([0, 0, 0, 0], [600, 10000, 1, 60000]),
+        init=[1, 1, 1, 1, 1],
+        bounds=([0, 0, 0, 0, 0], [600, 10000, 100, 1, 60000]),
     ):
         popt, _ = curve_fit(
             self._STL_objective, [self.x1, self.x2], self.y, p0=init, bounds=bounds
@@ -72,7 +72,7 @@ class Fit:
             self.fitted_params[1],
             self.fitted_params[2],
             self.fitted_params[3],
-            # self.fitted_params[4],
+            self.fitted_params[4],
         )
         self.y_fit = self._STL_objective(
             [self.x1_fit, self.x2_fit],
@@ -80,7 +80,7 @@ class Fit:
             self.fitted_params[1],
             self.fitted_params[2],
             self.fitted_params[3],
-            # self.fitted_params[4],
+            self.fitted_params[4],
         )
 
         self._compute_errors()
@@ -116,13 +116,13 @@ class Fit:
         for param in popt:
             self.fitted_params.append(param)
 
-        self.y_pred = self._exponential_decay_objective(
+        self.y_pred = self._exponential_decay_objective_bias(
             self.x1,
             self.fitted_params[0],
             self.fitted_params[1],
             self.fitted_params[2],
         )
-        self.y_fit = self._exponential_decay_objective(
+        self.y_fit = self._exponential_decay_objective_bias(
             self.x1_fit,
             self.fitted_params[0],
             self.fitted_params[1],
@@ -175,10 +175,10 @@ class Fit:
 
         self._compute_errors()
 
-    def _STL_objective(self, X, a, b, c, d):
+    def _STL_objective(self, X, a, b, c, d, e):
         pib_per_cap, rho = X
-        saturation = self._exponential_decay_objective(rho, a, b)
-        return saturation / (1 + np.exp(-c * (pib_per_cap - d)))
+        saturation = self._exponential_decay_objective_bias(rho, a, b, c)
+        return saturation / (1 + np.exp(-d * (pib_per_cap - e)))
 
     def _logistic_objective(self, X, a, b, c):
         return a / (1 + np.exp(-b * (X - c)))
