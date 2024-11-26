@@ -32,7 +32,7 @@ class Region:
         self.output_df_merged = None
 
         self.subregions = []
-        self.c_plot = ""  # plot color
+        self.urban_centres = []
 
         # outputs
         self.output_df = None #supposed to be the final DF with the observed values
@@ -161,6 +161,14 @@ class Region:
                     self.subregions.append(subregion)
                 except Exception as e:
                     print(e)
+
+    def make_subregions_ucdb(self, ucdb_file, uc_col: str, parent_col: str):
+        for _, row in ucdb_file.iterrows():
+            if row[parent_col] == self.name:
+                subregion = Region(row[uc_col], self.lvl + 1)
+                subregion.parent_name = self.name
+                self.subregions.append(subregion)
+
     
     def compute_own_df(self, years, type: str):
         # TODO: this should be changed to use the output_df_list instead
