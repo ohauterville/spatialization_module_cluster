@@ -169,6 +169,18 @@ class Region:
                 subregion.parent_name = self.name
                 self.subregions.append(subregion)
 
+    def make_subregions_ucdb_visual(self, ucdb_file, uc_col: str, parent_col: str, years):
+        for _, row in ucdb_file.iterrows():
+            if row[parent_col] == self.name:
+                subregion = Region(row[uc_col], self.lvl + 1)
+                subregion.parent_name = self.name
+                try:
+                    subregion.output_df_list.append(Df(pd.read_csv("/data/mineralogie/hautervo/data/Outputs/UCDB/"+subregion.parent_name+"/"+subregion.name+"/"+'_'.join(years)+".csv"), ""))
+                    subregion.merge_output_dfs("year")
+                except Exception as e:
+                    print(e)
+                self.subregions.append(subregion)
+
     
     def compute_own_df(self, years, type: str):
         # TODO: this should be changed to use the output_df_list instead
