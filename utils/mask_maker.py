@@ -66,9 +66,9 @@ def create_country_mask_from_shapefile(
         print("File already existing: ", output_file)
 
 ### MAIN
-type = "POP"
-year = "1990"
-mode = 1 # 0 for parallel, 1 for serial
+type = "V"
+year = "2020"
+mode = 0 # 0 for parallel, 1 for serial
 
 ###
 data_folder = "/data/mineralogie/hautervo/data/"

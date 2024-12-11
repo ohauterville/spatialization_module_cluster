@@ -111,7 +111,7 @@ class Region:
 
     def make_subregions(self, gpd_admin_units, subregion_col: str, parent_region_col: str, overwrite=False):
         for index, row in gpd_admin_units.iterrows():
-            if row[parent_region_col] == self.name:  # OECD specific
+            if row[parent_region_col] == self.name:  
                 subregion = Region(str(row[subregion_col]), self.lvl + 1)
                 subregion.parent_name = self.name
                 subregion.geometry = row.geometry
@@ -145,7 +145,7 @@ class Region:
                 ###
                 self.subregions.append(subregion)
 
-        print(colored("END: {self.name}", "green"))
+        print(colored(f"END: {self.name}", "green"))
 
     def make_subregions_visual(self, gpd_admin_units, subregion_col: str, parent_region_col: str, output_csv_paths: list, years):
         # this function is meant to be use for the visualization part only, not the preprocessing one.
