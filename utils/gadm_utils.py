@@ -87,25 +87,25 @@ def merge_raster(folder:str, output_file:str):
 
 
 ### MAIN
-import logging
-logging.basicConfig(level=logging.DEBUG)
+# import logging
+# logging.basicConfig(level=logging.DEBUG)
 
 type = "POP"
-year = "2010"
-mode = 0 # 0 for parallel, 1 for serial
+year = "1975"
+mode = 1 # 0 for parallel, 1 for serial
 
 ###
 data_folder = "/data/mineralogie/hautervo/data/"
 # admin_units = data_folder + "admin_units/world_administrative_boundaries_countries/world-administrative-boundaries.shp"
-admin_units = data_folder + "GADM/ESRI_54009/GADM_0_ESRI54009.shp"
-admin_units = data_folder + "OECD/admin_units/Country/OECD_Country_2020_simple1.shp"
-code = "GID_0"
-code = "iso3"
+admin_units = data_folder + "GADM/ESRI_54009/GADM_1_ESRI54009.shp"
+# admin_units = data_folder + "OECD/admin_units/Country/OECD_Country_2020_simple1.shp"
+code = "GID_1"
+# code = "iso3"
 
 raster_path = data_folder + "GHSL/Built_" + type + "/E" + year + "_100m_Global/"
 global_raster = raster_path + "GHS_BUILT_" + type + "_E" + year + "_GLOBE_R2023A_54009_100_V1_0.tif"
 
-output_path = raster_path + "subregions/"
+output_path = raster_path + "subregions/USA/"
 
 ###
 if __name__ == "__main__":
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     regions_gpd = gpd.read_file(admin_units)
 
     # regions_gpd = regions_gpd[regions_gpd["GID_0"] != "ATA"] # ignore antartica
-    # regions_gpd = regions_gpd[regions_gpd["GID_0"] == "USA"]
+    regions_gpd = regions_gpd[regions_gpd["GID_0"] == "USA"]
     regions_gpd = regions_gpd[~regions_gpd.geometry.isnull()]
 
     with rasterio.open(global_raster) as src:
