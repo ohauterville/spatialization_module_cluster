@@ -5,6 +5,7 @@ import fiona
 from concurrent.futures import ProcessPoolExecutor
 import itertools
 import os
+import time
 
 
 def make_subregional_mask(
@@ -23,13 +24,13 @@ def make_subregional_mask(
 
     if not os.path.isfile(output_file):
         try:
-            print("Starting ", subregion_name)
+            print(f"[{time.strftime('%H:%M:%S')}] Starting ", subregion_name)
             subregion_gdf = gpd.GeoDataFrame(geometry=[subregion.geometry], crs=crs)
             clipped_gdf = gpd.clip(src, subregion_gdf)
 
             os.makedirs(os.path.dirname(output_file), exist_ok="True")
             clipped_gdf.to_file(output_file)
-            print("Success: ", output_file)
+            print(f"[{time.strftime('%H:%M:%S')}] Successfully saved ", output_file)
         except Exception as e:
             print(e)
 
@@ -57,11 +58,13 @@ if __name__ == "__main__":
     mode = 0  # 0 for parallel, 1 for serial
 
     ###########################################
-    print(f"Reading src file from {shp_file}...")
+    print(f"[{time.strftime('%H:%M:%S')}] Reading src file from {shp_file}...")
     src = dgpd.read_file(shp_file, npartitions=max_workers).compute()
     print("Done.")
 
-    print(f"Reading admin units file from {admin_units}...")
+    print(
+        f"[{time.strftime('%H:%M:%S')}] Reading admin units file from {admin_units}..."
+    )
     subregions_gpd = gpd.read_file(
         admin_units, layer=layer, where=f"{parent_col}='{parent_key}'"
     )
@@ -70,16 +73,16 @@ if __name__ == "__main__":
     subregions_gpd = subregions_gpd[~subregions_gpd["geometry"].isna()]
     subregions_gpd = subregions_gpd[subregions_gpd["geometry"].is_valid]
 
-    print("Done.")
+    print(f"[{time.strftime('%H:%M:%S')}] Reading done.")
 
     if subregions_gpd.crs != src.crs:
-        print(src.crs, subregions_gpd.crs)
-        print("Reprojecting...")
+        print(f"[{time.strftime('%H:%M:%S')}] Reprojecting...")
         subregions_gpd.to_crs(src.crs, inplace=True)
+        print(f"[{time.strftime('%H:%M:%S')}] Reprojection done...")
 
     # PARALLEL MODE
     if mode == 0:
-        print("Starting parallel computing...")
+        print(f"[{time.strftime('%H:%M:%S')}] Starting parallel computing...")
         rows = list(subregions_gpd.iterrows())
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             executor.map(
