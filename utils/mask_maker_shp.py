@@ -1,100 +1,42 @@
 import geopandas as gpd
 import dask_geopandas as dgpd
 import fiona
-from dask_jobqueue import OARCluster
-from dask.distributed import Client
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-import itertools
+
+# import dask
+import dask.dataframe as dd
+
+# from dask import compute
 import os
-import gc
+
+# import gc
 import time
 import psutil
+import logging
 
 
-def make_subregional_mask(
-    src,
-    subregion,
-    subregion_col: str,
-    subregions_crs,
-):
-    """
-    This function takes a GeoTIFF and a shapefile of administrative boundaries
-    and clip the original GTIFF file along one country boundaries. To specify a country, one can
-    provide its iso3 name.
-    """
-    subregion_name = subregion[subregion_col]
-    output_file = output_path + subregion_name + ".shp"
+def clip_subregion(partition, subregion):
+    """Clips a single subregion and returns a GeoDataFrame"""
+    try:
+        # Clip the region using the source raster
+        clipped = partition.clip(subregion.geometry)
 
-    if not os.path.isfile(output_file):
-        try:
-            print(f"[{time.strftime('%H:%M:%S')}] Starting ", subregion_name)
+        # Return the clipped data as a GeoDataFrame (for Dask to handle)
+        return clipped
 
-            subregion_gdf = gpd.GeoDataFrame(
-                geometry=[subregion.geometry], crs=subregions_crs
-            )
-
-            if subregion_gdf.crs != src.crs:
-                print(f"[{time.strftime('%H:%M:%S')}] Reprojecting...")
-                subregion_gdf.to_crs(src.crs, inplace=True)
-                print(f"[{time.strftime('%H:%M:%S')}] Reprojection done.")
-            # clipped_gdf = gpd.clip(src, subregion_gdf)
-
-            # Perform the clip operation using Dask-GeoPandas
-            clipped = src.map_partitions(gpd.clip, subregion_gdf)
-
-            # Trigger computation and convert to a GeoDataFrame (if needed)
-            clipped_gdf = clipped.compute()
-
-            os.makedirs(os.path.dirname(output_file), exist_ok="True")
-            clipped_gdf.to_file(output_file)
-            print(f"[{time.strftime('%H:%M:%S')}] Successfully saved ", output_file)
-
-            del subregion, subregion_gdf, clipped_gdf
-            gc.collect()
-        except Exception as e:
-            print(e)
-
-    else:
-        print("File already exists: ", output_file)
-        del subregion
-        gc.collect()
+    except Exception as e:
+        print(
+            f"[{time.strftime('%H:%M:%S')}] ❌ Error clipping {subregion[subregion_col]}: {e}"
+        )
+        return None
 
 
-##### MAIN #####
+##### MAIN #####
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     print(f"[{time.strftime('%H:%M:%S')}] Starting main function...")
-    # Get the path to the node file from the OAR environment variable
-    node_file = os.environ.get("OAR_NODEFILE")
-
-    if node_file:
-        # Read the node file to count the number of nodes
-        with open(node_file, "r") as f:
-            nodes = f.readlines()
-        n_nodes = len(nodes)
-    else:
-        # If not running in an OAR job, assume 1 node
-        n_nodes = 1
-
-    n_cores = max(1, n_nodes * os.cpu_count() - 2)
-    print(f"[{time.strftime('%H:%M:%S')}] Starting with {n_cores} CPU cores...")
-
-    # Get available system memory in GB
-    total_memory = psutil.virtual_memory().total / (1024**3)  # GB
-    print(f"[{time.strftime('%H:%M:%S')}] Total memory: {total_memory:.2f} GB")
-
-    # Set the memory per worker (e.g., 4 GB per worker)
-    memory_per_worker = 16
-
-    # Compute the maximum number of workers based on memory and CPU cores
-    max_workers_based_on_memory = int(total_memory / memory_per_worker)
-    max_workers_based_on_cpu = n_cores
-
-    # Final number of workers: the limiting factor between memory and CPU
-    n_workers = min(max_workers_based_on_memory, max_workers_based_on_cpu)
-
-    client = Client(processes=True, threads_per_worker=1, n_workers=n_workers)
+    print(f"[{time.strftime('%H:%M:%S')}] Available CPU cores: {os.cpu_count()}")
     print(
-        f"[{time.strftime('%H:%M:%S')}] Starting with {n_workers} workers (based on {memory_per_worker} GB per worker)."
+        f"[{time.strftime('%H:%M:%S')}] Available memory: {psutil.virtual_memory().total / (1024**3)} GB"
     )
 
     lvl = 1
@@ -111,43 +53,54 @@ if __name__ == "__main__":
     shp_file = shp_path + f"v0_1-{parent_key}.gpkg"
     output_path = shp_path + "subregions/"
 
-    mode = 0  # 0 for parallel, 1 for serial
+    n_workers = min(os.cpu_count() - 2, 8)
 
-    ###########################################
+    # Read source file with Dask
     print(f"[{time.strftime('%H:%M:%S')}] Reading src file from {shp_file}...")
-    src = dgpd.read_file(shp_file, npartitions=n_cores)
+    src = dgpd.read_file(shp_file, npartitions=n_workers)
+    src = src.spatial_shuffle()  # Shuffle for better partitioning
+    src = src.persist()  # Keep the data in memory
     print(f"[{time.strftime('%H:%M:%S')}] Reading done.")
+
+    # Read subregions with Geopandas
     print(
         f"[{time.strftime('%H:%M:%S')}] Reading admin units file from {admin_units}..."
     )
     subregions_gpd = gpd.read_file(
         admin_units, layer=layer, where=f"{parent_col}='{parent_key}'"
     )
-    subregions_crs = subregions_gpd.crs
-    # some safety checks
     subregions_gpd = subregions_gpd[subregions_gpd["geometry"].is_valid]
-    # CRS Check
+
+    # Ensure CRS consistency
     if subregions_gpd.crs != src.crs:
         subregions_gpd = subregions_gpd.to_crs(src.crs)
 
     print(f"[{time.strftime('%H:%M:%S')}] Reading done.")
 
-    # PARALLEL MODE
-    if mode == 0:
-        print(f"[{time.strftime('%H:%M:%S')}] Starting parallel computing...")
-        rows = list(subregions_gpd.iterrows())
+    # Submit Tasks Using map_partitions
+    results = []
+    for _, subregion in subregions_gpd.iterrows():
+        result = src.map_partitions(clip_subregion, subregion)
+        results.append(result)
 
-        with ProcessPoolExecutor(max_workers=n_workers) as executor:
-            executor.map(
-                make_subregional_mask,
-                itertools.repeat(src),
-                (row for _, row in rows),
-                itertools.repeat(subregion_col),
-                itertools.repeat(subregions_gpd.crs),
-            )
+    # Concatenate all results into a single Dask GeoDataFrame
+    clipped = dd.concat(results)
 
-    # SERIAL MODE
-    elif mode == 1:
-        pass
+    # Persist to memory (triggers computation)
+    clipped = clipped.persist()
+
+    # Save files individually
+    for _, subregion in subregions_gpd.iterrows():
+        subregion_name = subregion[subregion_col]
+        output_file = output_path + subregion_name + ".shp"
+
+        if not os.path.isfile(output_file):
+            print(f"[{time.strftime('%H:%M:%S')}] Saving {output_file}")
+
+            # Compute and filter based on geometry intersection
+            filtered = clipped.compute()
+            filtered[filtered.intersects(subregion.geometry)].to_file(output_file)
+
+            print(f"[{time.strftime('%H:%M:%S')}] ✅ Saved {output_file}")
 
     print(f"[{time.strftime('%H:%M:%S')}] ✅ Job completed.")
