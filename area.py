@@ -78,11 +78,10 @@ def calculate_total_building_area(folder_path, output_csv="building_areas.csv"):
 
 # Example usage
 if __name__ == "__main__":
-    region = "BEL"
+    country_iso_code = "FRA"
 
     data_folder = "/data/mineralogie/hautervo/data/"
-    folder_path = data_folder + "EUBUCCO/eubucco-v0_1/FRA/"
-    # folder_path = data_folder + "EUBUCCO/eubucco-v0_1/" + region + "/subregions/"
+    folder_path = data_folder + f"EUBUCCO/eubucco-v0_1/{country_iso_code}/subregions/"
 
     csv_path = calculate_total_building_area(folder_path)
 
