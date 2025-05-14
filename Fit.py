@@ -6,9 +6,9 @@ class Fit:
         self.name = name
         self.fitted_params = []
 
-        self.x1 = x1
-        self.x2 = x2
-        self.y = y
+        self.x1 = np.asarray(x1, dtype=np.float64)
+        self.x2 = np.asarray(x2, dtype=np.float64)
+        self.y = np.asarray(y, dtype=np.float64)
 
         self.y_pred = []
         self.mse = np.nan
